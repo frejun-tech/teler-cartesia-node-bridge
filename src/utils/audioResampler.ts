@@ -21,6 +21,6 @@ export class AudioResampler {
             outputSamples[i] = Math.round(sample1 + (sample2 - sample1) * fraction);
         }
         
-        return Buffer.from(outputSamples.buffer);
+        return Buffer.from(outputSamples.buffer, outputSamples.byteOffset, outputSamples.byteLength);
     }
 }

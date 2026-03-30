@@ -49,7 +49,6 @@ export class CartesiaClient {
             Authorization: `Bearer ${this.token}`,
             "Cartesia-Version": this.version,
         };
-        console.info("Token: ", this.token);
         return headers;
     }
 

@@ -1,7 +1,6 @@
 import { StreamData, StreamHandlerResult, StreamOP } from "@frejun/teler";
 import { agentConfig } from "../core/agentConfig";
 import { AudioResampler } from "./audioResampler";
-import { config } from "../core/config";
 
 let isAck = false;
 let isStart = false;
@@ -37,7 +36,8 @@ export const callStreamHandler = async (message: StreamData): Promise<StreamHand
 
 export const remoteStreamHandler = () => {
     let chunkId = 1
-    const messageBuffer: Buffer[] = [];
+    const CHUNK_SIZE = 320;
+    let chunkBuffer = Buffer.alloc(0);
 
     const handler = async(message: StreamData): Promise<StreamHandlerResult> => {
         try {
@@ -50,21 +50,28 @@ export const remoteStreamHandler = () => {
                     console.log(`Cartesia Acknowledged the configuration`);
 
                 } else if(event === 'media_output') {
-                    const audio16k = control["media"]["payload"] || '';
+                    const audio16k       = control["media"]["payload"] || '';
                     const audio16kBuffer = Buffer.from(audio16k, "base64");
-                    const audio8kBuffer  = audioResampler.resample(audio16kBuffer, config.cartesiaSampleRate, 8000);
-                    const audio8k        = audio8kBuffer.toString("base64");
+                    const audio8kBuffer  = audioResampler.resample(audio16kBuffer, 16000, 8000);
 
-                    const payload = JSON.stringify({
-                        type: "audio",
-                        audio_b64: audio8k,
-                        chunk_id: chunkId++,
-                    });
-                    console.log("Relaying to Teler...");
-                    return [payload, StreamOP.RELAY];
+                    chunkBuffer = Buffer.concat([chunkBuffer, audio8kBuffer]);
+                    if (chunkBuffer.length >= CHUNK_SIZE) {
+                        const chunk = chunkBuffer.subarray(0, CHUNK_SIZE);
+                        chunkBuffer = chunkBuffer.subarray(CHUNK_SIZE);
+
+                        const payload = JSON.stringify({
+                            type: "audio",
+                            audio_b64: chunk.toString("base64"),
+                            chunk_id: chunkId++,
+                        });
+                        console.info("Relaying to Teler...");
+                        
+                        return [payload, StreamOP.RELAY];
+                    }
                     
                 } else if (event === 'clear') {
-                    console.log(`Flushing buffer of ${messageBuffer.length} chunks on speech stop`);
+                    console.log(`Flushing buffer of ${chunkBuffer.length} chunks on speech stop`);
+                    chunkBuffer = Buffer.alloc(0);
                     const payload = JSON.stringify({
                         type: "clear"
                     });
@@ -78,7 +85,7 @@ export const remoteStreamHandler = () => {
             
         } catch (error) {
             console.warn(`Error in remote stream handler: ${error}`);
-            messageBuffer.length = 0;
+            chunkBuffer = Buffer.alloc(0);
             return ['', StreamOP.PASS];
         }
     }
