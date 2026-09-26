@@ -25,9 +25,9 @@ wss.on('connection', async (telerWs: WebSocket) => {
     
     const connector = new StreamConnector(
         cartesiaClient.wsURL,
-        StreamType.BIDIRECTIONAL,
         callStreamHandler,
         remoteStreamHandler(),
+        StreamType.BIDIRECTIONAL,
         remoteHeaders
     );
 

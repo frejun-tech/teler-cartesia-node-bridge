@@ -16,4 +16,5 @@ export const config = {
     cartesiaApiKey:             process.env.CARTESIA_API_KEY || '',
     cartesiaSampleRate:         Number(process.env.CARTESIA_SAMPLE_RATE) || 16000,
     cartesiaBufferSize:         Number(process.env.CARTESIA_MESSAGE_BUFFER_SIZE) || 20,
+    cartesiaSystemPrompt:       process.env.CARTESIA_SYSTEM_PROMPT || '',
 } as const;
