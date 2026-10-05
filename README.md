@@ -19,17 +19,24 @@ A reference integration between Teler and CARTESIA in Node, based on [Media Stre
    docker compose up -d --build
    ```
 
+
 ## Environment Variables
 
-| Variable                   | Description                   | Default  |
-| -------------------------- | ----------------------------- | -------- |
-| `CARTESIA_AGENT_ID`        | Your CARTESIA assistant ID        | Required |
-| `CARTESIA_API_KEY`             | Your CARTESIA API key             | Required |
-| `CARTESIA_SAMPLE_RATE`         | Audio sample rate of CARTESIA     | 16000     |
-| `TELER_API_KEY`            | Your Teler API key            | Required |
-| `TELER_SAMPLE_RATE`        | Audio sample rate of Teler    | 8k       |
-| `TELER_CHUNK_SIZE`        | Chunk size of Teler audio      | 500      |
-| `NGROK_AUTHTOKEN`          | Your ngrok auth token         | Required |
+The following environment variables are required to configure the server, Teler integration, and Cartesia integration.
+
+| Variable | Description | Default |
+|---|---|---|
+| `PORT` | Port on which the application server runs. | `8000` |
+| `SERVER_DOMAIN` | Domain and port where the server is accessible. | `localhost:8000` |
+| `TELER_API_KEY` | API key used to authenticate with the Teler voice platform. | **Required** |
+| `TELER_SAMPLE_RATE` | Audio sample rate used for Teler audio streaming. | `16k` |
+| `TELER_CHUNK_SIZE` | Size of each audio chunk sent by Teler during streaming. | `400` |
+| `CARTESIA_AGENT_ID` | ID of the Cartesia agent to use for voice interactions. | **Required** |
+| `CARTESIA_BASE_URL` | Base URL for the Cartesia API, without the `https://` protocol prefix. | `api.cartesia.ai` |
+| `CARTESIA_API_KEY` | API key used to authenticate with Cartesia. | **Required** |
+| `CARTESIA_SAMPLE_RATE` | Audio sample rate used for Cartesia audio processing. This should be `16000` (16 kHz). | `16000` |
+| `CARTESIA_MESSAGE_BUFFER_SIZE` | Number of messages buffered from the Cartesia stream before streaming to Teler. | `10` |
+| `CARTESIA_SYSTEM_PROMPT` | System prompt that controls the Cartesia agent's behavior, response style, and conversational instructions. | See `.env.example` |
 
 ## API Endpoints
 
