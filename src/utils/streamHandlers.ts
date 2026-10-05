@@ -1,91 +1,100 @@
 import { StreamData, StreamHandlerResult, StreamOP } from "@frejun/teler";
-import { agentConfig } from "../core/agentConfig";
-import { AudioResampler } from "./audioResampler";
+import { getAgentConfig } from "../core/agentConfig";
+import { telerClient } from "./telerClient";
+import { Call } from "../models/calls";
 
-let isAck = false;
-let isStart = false;
-const audioResampler = new AudioResampler();
-
-export const callStreamHandler = async (message: StreamData): Promise<StreamHandlerResult> => {
-    try {
-        if(isAck && typeof message === "string") {
-            const data = JSON.parse(message);
-    
-            if(data["type"] === "audio") {
-                const audioB64 = data["data"]["audio_b64"];
-                const cartesiaPayload = JSON.stringify({
-                    event: "media_input",
-                    stream_id: data["stream_id"],
-                    media: {
-                        payload: audioB64
-                    }
-                })
-                return [cartesiaPayload, StreamOP.RELAY];
+export const callStreamHandler = (call: Call) => {
+    const handler = async (message: StreamData): Promise<StreamHandlerResult> => {
+        try {
+            const data = JSON.parse(message.toString());
+            if (data["type"] === "start") {
+                call.id = data?.call_id;
+            } else if(call.isAcked) {
+                if(data["type"] === "audio") {
+                    const audioB64 = data["data"]["audio_b64"];
+                    const cartesiaPayload = JSON.stringify({
+                        event: "media_input",
+                        stream_id: data["stream_id"],
+                        media: {
+                            payload: audioB64
+                        }
+                    })
+                    return [cartesiaPayload, StreamOP.RELAY];
+                }
+            } else if(!call.isStartSent) {
+                call.isStartSent = true;
+                const stream_id = data?.stream_id;
+                const agentConfig = getAgentConfig(stream_id);
+                return [agentConfig, StreamOP.RELAY];
             }
-        } else if(!isStart) {
-            isStart = true;
-            return [agentConfig, StreamOP.RELAY];
+            return ['', StreamOP.PASS];
+        } catch(err) {
+            console.log("Error in call stream handler", err);
+            return ['', StreamOP.PASS];
         }
-
-        return ['', StreamOP.PASS];
-    } catch(err) {
-        console.log("Error in call stream handler", err);
-        return ['', StreamOP.PASS];
     }
+    return handler;
 }
 
-export const remoteStreamHandler = () => {
+export const remoteStreamHandler = (call: Call) => {
     let chunkId = 1
-    const CHUNK_SIZE = 320;
-    let chunkBuffer = Buffer.alloc(0);
+    const CHUNK_SIZE = 10;
+    let messageBuffer: Buffer[] = [];
+
+    function _flush_buffer() {
+        const audioData = Buffer.concat(messageBuffer);
+        const resampledAudio = call.audioProcessor.downsample(audioData);
+
+        const payload = JSON.stringify({
+            type: "audio",
+            audio_b64: resampledAudio.toString("base64"),
+            chunk_id: chunkId++,
+        });
+        messageBuffer.length = 0;
+        return payload;
+    }
 
     const handler = async(message: StreamData): Promise<StreamHandlerResult> => {
         try {
-            if(typeof message === "string") {
-                const control = JSON.parse(message);
-                const event = control?.event;
+            const control = JSON.parse(message.toString());
+            const event = control?.event;
 
-                if(event === "ack") {
-                    isAck = true;
-                    console.log(`Cartesia Acknowledged the configuration`);
+            if(event === "ack") {
+                call.isAcked = true;
+                console.log(`Cartesia Acknowledged the configuration`);
+            } if(event === 'media_output') {
+                const audioData = control["media"]["payload"] || '';
+                messageBuffer.push(Buffer.from(audioData, 'base64'));
 
-                } else if(event === 'media_output') {
-                    const audio16k       = control["media"]["payload"] || '';
-                    const audio16kBuffer = Buffer.from(audio16k, "base64");
-                    const audio8kBuffer  = audioResampler.resample(audio16kBuffer, 16000, 8000);
-
-                    chunkBuffer = Buffer.concat([chunkBuffer, audio8kBuffer]);
-                    if (chunkBuffer.length >= CHUNK_SIZE) {
-                        const chunk = chunkBuffer.subarray(0, CHUNK_SIZE);
-                        chunkBuffer = chunkBuffer.subarray(CHUNK_SIZE);
-
-                        const payload = JSON.stringify({
-                            type: "audio",
-                            audio_b64: chunk.toString("base64"),
-                            chunk_id: chunkId++,
-                        });
-                        console.info("Relaying to Teler...");
-                        
-                        return [payload, StreamOP.RELAY];
-                    }
-                    
-                } else if (event === 'clear') {
-                    console.log(`Flushing buffer of ${chunkBuffer.length} chunks on speech stop`);
-                    chunkBuffer = Buffer.alloc(0);
-                    const payload = JSON.stringify({
-                        type: "clear"
-                    });
-                    return [payload, StreamOP.RELAY];
-                    
+                if (messageBuffer.length >= CHUNK_SIZE) {
+                    return [_flush_buffer(), StreamOP.RELAY];
+                }
+            } if (event === 'clear') {
+                console.log(`Flushing buffer of ${messageBuffer.length} chunks on speech stop`);
+                messageBuffer.length = 0;
+                const payload = JSON.stringify({
+                    type: "clear"
+                });
+                return [payload, StreamOP.RELAY];
+            } if (event === 'transfer_call') {
+                console.log(`The agent want's to transfer the call to a humana representative.`);
+                const destination_number = control?.transfer?.target_phone_number || null;
+                if (destination_number === null) {
+                    console.warn("No destination number selected.");
                 } else {
-                    console.log(`Cartesia Error: ${JSON.stringify(control)}`);
+                    const transfer_result = telerClient.voice.operations.transfer(call.id!, {
+                        target: destination_number
+                    });
+                    console.log(`Call transfer result: ${transfer_result}`);
                 }
             }
+            else {
+                console.log(`Cartesia Error: ${JSON.stringify(control)}`);
+            }
             return ['', StreamOP.PASS];
-            
         } catch (error) {
             console.warn(`Error in remote stream handler: ${error}`);
-            chunkBuffer = Buffer.alloc(0);
+            messageBuffer.length = 0;
             return ['', StreamOP.PASS];
         }
     }

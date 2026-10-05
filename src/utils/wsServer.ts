@@ -6,6 +6,8 @@ import { StreamType }      from '@frejun/teler';
 import { callStreamHandler, remoteStreamHandler } from './streamHandlers';
 import { config } from '../core/config';
 import { CartesiaClient } from './cartesiaClient';
+import { telerClient } from './telerClient';
+import { Call } from '../models/calls';
 
 export const wss = new WebSocketServer({ noServer: true });
 
@@ -22,11 +24,11 @@ wss.on('connection', async (telerWs: WebSocket) => {
     }
     
     const remoteHeaders = cartesiaClient.getHeaders();
-    
-    const connector = new StreamConnector(
+    const call = new Call();
+    const connector = telerClient.streamConnector.create(
         cartesiaClient.wsURL,
-        callStreamHandler,
-        remoteStreamHandler(),
+        callStreamHandler(call),
+        remoteStreamHandler(call),
         StreamType.BIDIRECTIONAL,
         remoteHeaders
     );
