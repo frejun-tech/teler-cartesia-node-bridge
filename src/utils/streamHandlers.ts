@@ -62,21 +62,21 @@ export const remoteStreamHandler = (call: Call) => {
             if(event === "ack") {
                 call.isAcked = true;
                 console.log(`Cartesia Acknowledged the configuration`);
-            } if(event === 'media_output') {
+            } else if(event === 'media_output') {
                 const audioData = control["media"]["payload"] || '';
                 messageBuffer.push(Buffer.from(audioData, 'base64'));
 
                 if (messageBuffer.length >= CHUNK_SIZE) {
                     return [_flush_buffer(), StreamOP.RELAY];
                 }
-            } if (event === 'clear') {
+            } else if (event === 'clear') {
                 console.log(`Flushing buffer of ${messageBuffer.length} chunks on speech stop`);
                 messageBuffer.length = 0;
                 const payload = JSON.stringify({
                     type: "clear"
                 });
                 return [payload, StreamOP.RELAY];
-            } if (event === 'transfer_call') {
+            } else if (event === 'transfer_call') {
                 console.log(`The agent want's to transfer the call to a humana representative.`);
                 const destination_number = control?.transfer?.target_phone_number || null;
                 if (destination_number === null) {
@@ -87,6 +87,8 @@ export const remoteStreamHandler = (call: Call) => {
                     });
                     console.log(`Call transfer result: ${transfer_result}`);
                 }
+            } else if (event === "turn_output_text_delta") {
+                console.debug(`Agent transcript: ${JSON.stringify(control)}`);
             }
             else {
                 console.log(`Cartesia Error: ${JSON.stringify(control)}`);

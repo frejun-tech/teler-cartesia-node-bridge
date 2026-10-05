@@ -48,15 +48,14 @@ export class AudioProcessor {
         
         this.cartesiaOutputRate = 16000; // Cartesia output sample rate
         
-        this.downSamplingFactor = this.cartesiaOutputRate / this.TelerInputRate; // 3 — keep 1 of every 3
+        this.downSamplingFactor = this.cartesiaOutputRate / this.TelerInputRate;
 
         // Cutoff a bit below the new Nyquist (4000Hz) leaves safety margin
         const cutoff = this.TelerInputRate / 2 * 0.8; // ~3200 Hz
 
-        // Chain 4 filters = a stronger, steeper blur (more thorough than 1 pass)
         this.filters = [1, 2, 3, 4].map(() => new BiquadLowPass(this.cartesiaOutputRate, cutoff));
 
-        this.sampleCounter = 0; // persists across chunks so the "every 3rd" pattern stays aligned
+        this.sampleCounter = 0;
     }
 
     public downsample(audioData: Buffer): Buffer {
@@ -69,7 +68,7 @@ export class AudioProcessor {
             // Step A: smooth / blur
             for (const f of this.filters) sample = f.process(sample);
 
-            // Step B: thin out, keeping 1 sample out of 3
+            // Step B: thin out
             if (this.sampleCounter % this.downSamplingFactor === 0) {
                 const clamped = Math.max(-1, Math.min(1, sample));
                 out.push(Math.round(clamped * 32767)); // Float32 -> Int16
