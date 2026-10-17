@@ -159,18 +159,10 @@ These values are taken from the code (`src/core/config.ts`). Where this table an
 curl -X POST "https://your_ngrok_domain/api/v1/calls/initiate-call" \
   -H "Content-Type: application/json" \
   -d '{
-    "from_number": "+918064xxx",
-    "to_number": "+919967xxx"
+    "fromNumber": "+918064xxx",
+    "toNumber": "+919967xxx"
   }'
 ```
-
-> **Note:** In this Node bridge, `POST /api/v1/calls/initiate-call` reads `fromNumber` and `toNumber` (camelCase) from the request body, plus an optional `record` flag (default `true`). The media WebSocket is served at `/api/v1/media-stream`. For example:
->
-> ```bash
-> curl -X POST "http://localhost:8000/api/v1/calls/initiate-call" \
->   -H "Content-Type: application/json" \
->   -d '{"fromNumber": "+1234567890", "toNumber": "+0987654321"}'
-> ```
 
 ## Features
 
